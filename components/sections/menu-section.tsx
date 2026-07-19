@@ -68,7 +68,7 @@ export function MenuSection() {
           canvas.width = vp.width;
           canvas.height = vp.height;
           await pg.render({ canvas, viewport: vp }).promise;
-          images.push(canvas.toDataURL("image/jpeg", 0.85));
+          images.push(canvas.toDataURL("image/jpeg", 0.95));
         }
         if (!cancelled) setPageImages(images);
       } catch (err) {
@@ -182,10 +182,12 @@ export function MenuSection() {
                   <div className="relative" style={{ width: pageWidth, height: pageHeight }}>
                     <Page
                       src={
-                        animating && animDir === "prev" && nextLeftIdx >= 0
+                        animating && animDir === "next"
+                          ? showSpread
+                            ? pageImages[nextLeftIdx] ?? ""
+                            : pageImages[Math.min(leftIdx + 1, pageImages.length - 1)] ?? ""
+                          : animating && animDir === "prev" && nextLeftIdx >= 0
                           ? pageImages[nextLeftIdx] ?? ""
-                          : !showSpread && animating && animDir === "next" && leftIdx + 1 < pageImages.length
-                          ? pageImages[leftIdx + 1] ?? ""
                           : pageImages[leftIdx] ?? ""
                       }
                       width={pageWidth}
