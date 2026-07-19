@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { BookOpen, ChevronLeft, ChevronRight, X, Loader2 } from "lucide-react";
 
@@ -15,14 +15,6 @@ export function MenuSection() {
   const [pageImages, setPageImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [FlipBook, setFlipBook] = useState<any>(null);
-  const flipBookRef = useRef<any>(null);
-
-  useEffect(() => {
-    import("react-pageflip").then((mod) => {
-      setFlipBook(() => mod.default);
-    });
-  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -50,11 +42,11 @@ export function MenuSection() {
 
         const isMobile = window.innerWidth < 768;
         const maxWidth = isMobile
-          ? window.innerWidth * 0.85
-          : window.innerWidth * 0.9;
+          ? window.innerWidth * 0.82
+          : window.innerWidth * 0.35;
         const maxHeight = isMobile
           ? window.innerHeight * 0.55
-          : window.innerHeight * 0.75;
+          : window.innerHeight * 0.7;
         const scaleW = maxWidth / origViewport.width;
         const scaleH = maxHeight / origViewport.height;
         const scale = Math.min(scaleW, scaleH);
@@ -97,17 +89,28 @@ export function MenuSection() {
     };
   }, [open]);
 
-  const onFlip = useCallback((e: any) => {
-    setCurrentPage(e.data + 1);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768);
+    check();
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
   }, []);
 
   const goToPrev = useCallback(() => {
-    flipBookRef.current?.pageFlip()?.flipPrev();
+    setCurrentPage((p) => Math.max(1, p - 1));
   }, []);
 
   const goToNext = useCallback(() => {
-    flipBookRef.current?.pageFlip()?.flipNext();
+    setCurrentPage((p) => Math.min(numPages, p + 1));
   }, []);
+
+  const showPrev = currentPage > 1;
+  const showNext = currentPage < numPages;
+  const showSpread = !isMobile && currentPage < numPages;
+  const leftIdx = currentPage - 1;
+  const rightIdx = showSpread ? currentPage : -1;
 
   return (
     <section id="menu" className="py-20 md:py-28 lg:py-36">
@@ -134,19 +137,14 @@ export function MenuSection() {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent
-          className="bg-background border-border max-w-[95vw] w-auto p-0 gap-0 overflow-hidden"
-          showCloseButton={false}
-        >
+        <DialogContent className="bg-background border-border max-w-[95vw] w-auto p-0 gap-0 overflow-hidden" showCloseButton={false}>
           <DialogTitle className="sr-only">Menu Bar Toninho</DialogTitle>
 
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-            <span className="text-sm font-medium text-foreground">
-              Menù Bar Toninho
-            </span>
+            <span className="text-sm font-medium text-foreground">Menù Bar Toninho</span>
             <div className="flex items-center gap-3">
               <span className="text-xs text-muted-foreground">
-                Pagina {currentPage} / {numPages || "—"}
+                {currentPage}{numPages > 0 ? ` / ${numPages}` : ""}
               </span>
               <button
                 onClick={() => setOpen(false)}
@@ -158,93 +156,68 @@ export function MenuSection() {
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-2 px-2 py-4 min-h-[400px] md:min-h-[500px]">
+          <div className="flex items-center justify-center gap-1 sm:gap-2 px-2 py-4 min-h-[300px] md:min-h-[400px]">
             <button
               onClick={goToPrev}
-              className="shrink-0 rounded-full p-2 hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30"
-              disabled={currentPage <= 1 || loading}
+              className={`shrink-0 rounded-full p-1.5 sm:p-2 hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-20 ${showPrev ? "" : "invisible"}`}
+              disabled={!showPrev || loading}
               aria-label="Pagina precedente"
             >
-              <ChevronLeft size={24} />
+              <ChevronLeft size={22} />
             </button>
 
-            <div
-              className="flex justify-center overflow-hidden"
-              style={{
-                width: pageWidth * 2 + 24,
-                height: pageHeight + 8,
-              }}
-            >
+            <div className="flex justify-center items-center gap-1 overflow-hidden">
               {loading && (
-                <div className="flex items-center justify-center w-full gap-2">
+                <div className="flex items-center justify-center gap-2" style={{ width: pageWidth * 2 + 8, height: pageHeight }}>
                   <Loader2 size={20} className="animate-spin text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground animate-pulse">
-                    Caricamento menu...
-                  </span>
+                  <span className="text-sm text-muted-foreground animate-pulse">Caricamento menu...</span>
                 </div>
               )}
               {error && (
-                <div className="flex items-center justify-center w-full">
-                  <div className="text-sm text-destructive text-center px-4">
-                    {error}
-                  </div>
+                <div className="flex items-center justify-center" style={{ width: pageWidth * 2 + 8, height: pageHeight }}>
+                  <div className="text-sm text-destructive text-center px-4">{error}</div>
                 </div>
               )}
-              {!loading && !error && pageImages.length > 0 && FlipBook && (
-                <FlipBook
-                  ref={flipBookRef}
-                  width={pageWidth}
-                  height={pageHeight}
-                  size="fixed"
-                  maxShadowOpacity={0.4}
-                  mobileScrollSupport={true}
-                  clickEventForward={false}
-                  useMouseEvents={true}
-                  swipeDistance={30}
-                  flippingTime={600}
-                  startZIndex={0}
-                  autoSize={false}
-                  drawShadow={true}
-                  startPage={0}
-                  startOrientation="portrait"
-                  onFlip={onFlip}
-                  className="shadow-2xl"
-                >
-                  {pageImages.map((src, i) => (
-                    <div
-                      key={i}
-                      className="bg-white flex items-center justify-center overflow-hidden"
-                      style={{ width: pageWidth, height: pageHeight }}
-                    >
+              {!loading && !error && pageImages.length > 0 && (
+                <div className="flex gap-1" style={{ height: pageHeight }}>
+                  {leftIdx >= 0 && leftIdx < pageImages.length && (
+                    <div className="bg-white shadow-md flex items-center justify-center overflow-hidden" style={{ width: pageWidth, height: pageHeight }}>
                       <img
-                        src={src}
-                        alt={`Pagina ${i + 1}`}
-                        style={{
-                          width: pageWidth,
-                          height: pageHeight,
-                          objectFit: "contain",
-                          display: "block",
-                        }}
+                        src={pageImages[leftIdx]}
+                        alt={`Pagina ${currentPage}`}
+                        className="block"
+                        style={{ width: pageWidth, height: pageHeight, objectFit: "contain" }}
                         draggable={false}
                       />
                     </div>
-                  ))}
-                </FlipBook>
+                  )}
+                  {rightIdx >= 0 && rightIdx < pageImages.length && (
+                    <div className="bg-white shadow-md flex items-center justify-center overflow-hidden" style={{ width: pageWidth, height: pageHeight }}>
+                      <img
+                        src={pageImages[rightIdx]}
+                        alt={`Pagina ${currentPage + 1}`}
+                        className="block"
+                        style={{ width: pageWidth, height: pageHeight, objectFit: "contain" }}
+                        draggable={false}
+                      />
+                    </div>
+                  )}
+                </div>
               )}
             </div>
 
             <button
               onClick={goToNext}
-              className="shrink-0 rounded-full p-2 hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30"
-              disabled={currentPage >= numPages || loading}
+              className={`shrink-0 rounded-full p-1.5 sm:p-2 hover:bg-muted transition-colors text-muted-foreground hover:text-foreground disabled:opacity-20 ${showNext ? "" : "invisible"}`}
+              disabled={!showNext || loading}
               aria-label="Pagina successiva"
             >
-              <ChevronRight size={24} />
+              <ChevronRight size={22} />
             </button>
           </div>
 
           <div className="text-center pb-4 text-xs text-muted-foreground">
-            Clicca sul bordo pagina o usa le frecce per sfogliare
+            Usa le frecce per sfogliare il menu
           </div>
         </DialogContent>
       </Dialog>
