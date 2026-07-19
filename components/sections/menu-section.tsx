@@ -236,7 +236,6 @@ export function MenuSection() {
                   height={pageHeight}
                   size="fixed"
                   maxShadowOpacity={0.4}
-                  showCover={true}
                   mobileScrollSupport={true}
                   clickEventForward={false}
                   useMouseEvents={true}
