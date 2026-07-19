@@ -2,66 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { BookOpen, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { BookOpen, ChevronLeft, ChevronRight, X, Loader2 } from "lucide-react";
 
 const PDF_URL = "/menu-bar-toninho.pdf";
-
-function PdfPage({
-  pageNumber,
-  width,
-  height,
-  pdfDoc,
-}: {
-  pageNumber: number;
-  width: number;
-  height: number;
-  pdfDoc: any;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const renderTaskRef = useRef<{ cancel: () => void } | null>(null);
-
-  useEffect(() => {
-    if (!pdfDoc) return;
-    let cancelled = false;
-
-    async function renderPage() {
-      const canvas = canvasRef.current;
-      if (!canvas) return;
-
-      const page = await pdfDoc.getPage(pageNumber);
-      if (cancelled) return;
-
-      const scale = width / page.getViewport({ scale: 1 }).width;
-      const viewport = page.getViewport({ scale });
-
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
-
-      const renderTask = page.render({ canvasContext: ctx, viewport });
-      renderTaskRef.current = renderTask;
-      await renderTask.promise;
-    }
-
-    renderPage();
-
-    return () => {
-      cancelled = true;
-      renderTaskRef.current?.cancel();
-    };
-  }, [pageNumber, width, height, pdfDoc]);
-
-  return (
-    <div
-      className="bg-white shadow-2xl"
-      style={{ width, height, pageBreakAfter: "always" }}
-    >
-      <canvas ref={canvasRef} className="block" style={{ width, height }} />
-    </div>
-  );
-}
 
 export function MenuSection() {
   const [open, setOpen] = useState(false);
@@ -69,7 +12,7 @@ export function MenuSection() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageWidth, setPageWidth] = useState(400);
   const [pageHeight, setPageHeight] = useState(560);
-  const [pdfDoc, setPdfDoc] = useState<any>(null);
+  const [pageImages, setPageImages] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [FlipBook, setFlipBook] = useState<any>(null);
@@ -89,41 +32,58 @@ export function MenuSection() {
     async function loadPdf() {
       setLoading(true);
       setError(null);
-      setPdfDoc(null);
+      setPageImages([]);
       setNumPages(0);
       setCurrentPage(1);
 
       try {
         const pdfjsLib = await import("pdfjs-dist");
         pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
-        const doc = await pdfjsLib.getDocument({
-          url: PDF_URL,
-        }).promise;
+
+        const doc = await pdfjsLib.getDocument({ url: PDF_URL }).promise;
         if (cancelled) return;
 
         setNumPages(doc.numPages);
-        setPdfDoc(doc);
 
-        const page = await doc.getPage(1);
-        const viewport = page.getViewport({ scale: 1 });
+        const firstPage = await doc.getPage(1);
+        const origViewport = firstPage.getViewport({ scale: 1 });
+
         const isMobile = window.innerWidth < 768;
         const maxWidth = isMobile
           ? window.innerWidth * 0.85
-          : window.innerWidth * 0.4;
+          : window.innerWidth * 0.9;
         const maxHeight = isMobile
           ? window.innerHeight * 0.55
-          : window.innerHeight * 0.65;
-        const scaleW = maxWidth / viewport.width;
-        const scaleH = maxHeight / viewport.height;
+          : window.innerHeight * 0.75;
+        const scaleW = maxWidth / origViewport.width;
+        const scaleH = maxHeight / origViewport.height;
         const scale = Math.min(scaleW, scaleH);
-        setPageWidth(Math.floor(viewport.width * scale));
-        setPageHeight(Math.floor(viewport.height * scale));
+
+        const imgWidth = Math.floor(origViewport.width * scale);
+        const imgHeight = Math.floor(origViewport.height * scale);
+
+        setPageWidth(imgWidth);
+        setPageHeight(imgHeight);
+
+        const images: string[] = [];
+        for (let i = 1; i <= doc.numPages; i++) {
+          if (cancelled) return;
+          const pg = await doc.getPage(i);
+          const vp = pg.getViewport({ scale });
+          const canvas = document.createElement("canvas");
+          canvas.width = vp.width;
+          canvas.height = vp.height;
+          await pg.render({ canvas, viewport: vp }).promise;
+          images.push(canvas.toDataURL("image/jpeg", 0.85));
+        }
+
+        if (!cancelled) {
+          setPageImages(images);
+        }
       } catch (err) {
         console.error("PDF load error:", err);
         if (!cancelled) {
-          setError(
-            "Impossibile caricare il menu. Riprova più tardi."
-          );
+          setError("Impossibile caricare il menu. Riprova più tardi.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -211,15 +171,16 @@ export function MenuSection() {
             <div
               className="flex justify-center overflow-hidden"
               style={{
-                width: pageWidth * 2 + 16,
+                width: pageWidth * 2 + 24,
                 height: pageHeight + 8,
               }}
             >
               {loading && (
-                <div className="flex items-center justify-center w-full">
-                  <div className="text-sm text-muted-foreground animate-pulse">
+                <div className="flex items-center justify-center w-full gap-2">
+                  <Loader2 size={20} className="animate-spin text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground animate-pulse">
                     Caricamento menu...
-                  </div>
+                  </span>
                 </div>
               )}
               {error && (
@@ -229,7 +190,7 @@ export function MenuSection() {
                   </div>
                 </div>
               )}
-              {!loading && !error && pdfDoc && FlipBook && (
+              {!loading && !error && pageImages.length > 0 && FlipBook && (
                 <FlipBook
                   ref={flipBookRef}
                   width={pageWidth}
@@ -249,17 +210,22 @@ export function MenuSection() {
                   onFlip={onFlip}
                   className="shadow-2xl"
                 >
-                  {Array.from({ length: numPages }, (_, i) => (
+                  {pageImages.map((src, i) => (
                     <div
                       key={i}
                       className="bg-white flex items-center justify-center overflow-hidden"
                       style={{ width: pageWidth, height: pageHeight }}
                     >
-                      <PdfPage
-                        pageNumber={i + 1}
-                        width={pageWidth}
-                        height={pageHeight}
-                        pdfDoc={pdfDoc}
+                      <img
+                        src={src}
+                        alt={`Pagina ${i + 1}`}
+                        style={{
+                          width: pageWidth,
+                          height: pageHeight,
+                          objectFit: "contain",
+                          display: "block",
+                        }}
+                        draggable={false}
                       />
                     </div>
                   ))}
