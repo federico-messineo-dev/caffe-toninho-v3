@@ -95,11 +95,9 @@ export function MenuSection() {
 
       try {
         const pdfjsLib = await import("pdfjs-dist");
-        pdfjsLib.GlobalWorkerOptions.workerSrc = "";
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
         const doc = await pdfjsLib.getDocument({
           url: PDF_URL,
-          // @ts-expect-error - isEvalSupported is not in the types but works at runtime
-          isEvalSupported: false,
         }).promise;
         if (cancelled) return;
 
