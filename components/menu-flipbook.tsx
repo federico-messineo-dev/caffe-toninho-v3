@@ -33,7 +33,8 @@ export function MenuFlipbook({ pdfUrl, onClose }: MenuFlipbookProps) {
   const [bookSize, setBookSize] = useState<{
     width: number;
     height: number;
-  }>({ width: 596, height: 842 });
+    isSpread: boolean;
+  }>({ width: 596, height: 842, isSpread: false });
   const flipRef = useRef<any>(null);
   const mountedRef = useRef(true);
 
@@ -191,20 +192,43 @@ export function MenuFlipbook({ pdfUrl, onClose }: MenuFlipbookProps) {
 
   useEffect(() => {
     if (!dimensions) return;
-    const ratio = dimensions.width / dimensions.height;
+    const pageRatio = dimensions.width / dimensions.height;
 
     function calcSize() {
       const vw = window.innerWidth;
       const vh = window.innerHeight;
-      const maxW = Math.min(vw - 48, 896);
-      const maxH = vh * 0.78;
-      let w = maxW;
-      let h = w / ratio;
-      if (h > maxH) {
-        h = maxH;
-        w = h * ratio;
+      const isDesktop = vw >= 768;
+
+      if (isDesktop) {
+        const maxW = Math.min(vw - 64, 1060);
+        const maxH = vh * 0.82;
+        const spreadRatio = 2 * pageRatio;
+        let h = maxH;
+        let w = h * spreadRatio;
+        if (w > maxW) {
+          w = maxW;
+          h = w / spreadRatio;
+        }
+        setBookSize({
+          width: Math.round(w),
+          height: Math.round(h),
+          isSpread: true,
+        });
+      } else {
+        const maxW = Math.min(vw - 32, 420);
+        const maxH = vh * 0.72;
+        let w = maxW;
+        let h = w / pageRatio;
+        if (h > maxH) {
+          h = maxH;
+          w = h * pageRatio;
+        }
+        setBookSize({
+          width: Math.round(w),
+          height: Math.round(h),
+          isSpread: false,
+        });
       }
-      setBookSize({ width: Math.round(w), height: Math.round(h) });
     }
 
     calcSize();
@@ -229,7 +253,9 @@ export function MenuFlipbook({ pdfUrl, onClose }: MenuFlipbookProps) {
   }
 
   const totalPages = pages.length;
-  const displayPage = Math.min(currentPage + 1, totalPages);
+  const displayPage = bookSize.isSpread
+    ? `${currentPage + 1}-${Math.min(currentPage + 2, totalPages)}`
+    : `${currentPage + 1}`;
 
   return (
     <div className="fixed inset-0 z-[100] flex flex-col bg-black/85 backdrop-blur-md">
@@ -282,13 +308,13 @@ export function MenuFlipbook({ pdfUrl, onClose }: MenuFlipbookProps) {
                 key={pages.length}
                 className="w-full h-full"
                 style={{}}
-                width={bookSize.width}
-                height={bookSize.height}
-                size="fixed"
+                width={dimensions?.width ?? 596}
+                height={dimensions?.height ?? 842}
+                size="stretch"
                 startPage={0}
                 drawShadow
                 flippingTime={700}
-                usePortrait
+                usePortrait={!bookSize.isSpread}
                 showCover
                 clickEventForward
                 mobileScrollSupport
