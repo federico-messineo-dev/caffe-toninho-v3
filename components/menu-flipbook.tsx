@@ -58,7 +58,7 @@ export function MenuFlipbook({ pdfUrl, onClose }: MenuFlipbookProps) {
         const pdfjsLib = await import("pdfjs-dist");
         pdfjsLib.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
-        const pdf = await pdfjsLib.getDocument(pdfUrl).promise;
+        const pdf = await pdfjsLib.getDocument({ url: pdfUrl }).promise;
         if (cancelled || !mountedRef.current) return;
 
         const totalPages = pdf.numPages;
